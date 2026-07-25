@@ -26,10 +26,40 @@ ASCII_ART = """⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⢀⢀⢀⡀⠀⠀⠀⠀�
 ⠀⠀⠀⠀⠀⠀⠀⠀⠃⠷⠀⠄⣤⡀⠀⣠⠠⣤⠄⠼⠟⠉⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠁⠈⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀"""
 
-def play_beep():
-    """Generates a standard terminal hardware beep."""
-    sys.stdout.write('\a')
-    sys.stdout.flush()
+def play_audio(filename, async_play=True):
+    path = os.path.join(os.path.dirname(__file__), "assets", filename)
+    if not os.path.exists(path):
+        sys.stdout.write('\a')
+        sys.stdout.flush()
+        return
+
+    if os.name == 'nt':
+        try:
+            import winsound
+            flags = winsound.SND_FILENAME
+            if async_play:
+                flags |= winsound.SND_ASYNC
+            winsound.PlaySound(path, flags)
+        except:
+            sys.stdout.write('\a')
+    else:
+        # termux/linux fallback
+        bg = "&" if async_play else ""
+        os.system(f"termux-media-player play {path} > /dev/null 2>&1 {bg} || play -q {path} > /dev/null 2>&1 {bg}")
+
+def play_typing():
+    play_audio("sfx_typing.wav", async_play=True)
+
+def play_glitch():
+    play_audio("sfx_glitch.wav", async_play=True)
+
+def stop_audio():
+    if os.name == 'nt':
+        try:
+            import winsound
+            winsound.PlaySound(None, winsound.SND_PURGE)
+        except:
+            pass
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
@@ -46,8 +76,8 @@ def typewriter_effect(text, speed=0.02, sound=False):
     for char in text:
         sys.stdout.write(char)
         sys.stdout.flush()
-        if sound and random.random() < 0.15: 
-            play_beep()
+        if sound and random.random() < 0.2: 
+            play_typing()
         time.sleep(speed)
     print()
 
@@ -57,8 +87,8 @@ def typewriter_centered(text, color="", speed=0.02, sound=False):
     for char in text:
         sys.stdout.write(char)
         sys.stdout.flush()
-        if sound and random.random() < 0.15: 
-            play_beep()
+        if sound and random.random() < 0.2: 
+            play_typing()
         time.sleep(speed)
     print(RESET)
 
@@ -68,15 +98,15 @@ def full_screen_glitch_exit(duration=2.5):
     characters = "!@#$%^&*()_+-=[]{}|;:,.<>?/\\~`0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     colors = [CYAN, RED, GREEN, BOLD]
     
+    play_glitch()
     while time.time() - start_time < duration:
         clear_screen()
-        # Full screen matrix garbage
         for _ in range(terminal_size.lines - 1):
             line = "".join(random.choice(characters) for _ in range(terminal_size.columns))
             print(f"{random.choice(colors)}{line}{RESET}")
-        play_beep()
         time.sleep(0.05)
     
+    stop_audio()
     clear_screen()
     sys.exit(0)
 
@@ -87,8 +117,9 @@ def center_glitch_effect(duration=1.5):
     line_len = max(len(line) for line in ascii_lines)
     
     h_pad = get_horizontal_padding(line_len)
-    v_pad = get_vertical_padding(len(ascii_lines) + 6) # extra room for text below
+    v_pad = get_vertical_padding(len(ascii_lines) + 6)
     
+    play_glitch()
     while time.time() - start_time < duration:
         clear_screen()
         print(v_pad, end="")
@@ -100,9 +131,9 @@ def center_glitch_effect(duration=1.5):
                 else:
                     glitched_line += char
             print(f"{h_pad}{CYAN}{glitched_line}{RESET}")
-        play_beep() 
         time.sleep(0.1)
     
+    stop_audio()
     clear_screen()
     print(v_pad, end="")
     for line in ascii_lines:
@@ -115,20 +146,16 @@ def startup_sequence():
     clear_screen()
     time.sleep(0.5)
     
-    # 1. Centered Glitch Art
     center_glitch_effect(duration=2.0)
     print("\n")
     
-    # 2. Centered Text
     typewriter_centered("JOIN YES?   Y=YES   N=NO", color=f"{RED}{BOLD}", speed=0.04, sound=True)
     
-    # Center input prompt
-    h_pad = get_horizontal_padding(2) # length of "> "
+    h_pad = get_horizontal_padding(2)
     sys.stdout.write(h_pad + f"{CYAN}> {RESET}")
     choice = input().strip().upper()
     
     if choice != 'Y':
-        # 3. Full Terminal Glitch if NO
         full_screen_glitch_exit(duration=2.5)
         
     typewriter_centered("ACCESS GRANTED.", color=f"{GREEN}{BOLD}", speed=0.04, sound=True)
@@ -172,7 +199,7 @@ def add_tool(tools):
 
 def grab_latest_photo():
     print(f"\n{CYAN}[+] INITIATING AUTO-GRAB PROTOCOL{RESET}")
-    play_beep()
+    play_typing()
     time.sleep(0.5)
     
     camera_dir = os.path.expanduser("~/storage/dcim/Camera/")
@@ -217,13 +244,13 @@ def grab_latest_photo():
 
 def execute_tool(name, command):
     clear_screen()
-    play_beep()
+    play_typing()
     print(f"{CYAN}{'='*50}{RESET}")
     typewriter_effect(f"{BOLD}Executing Module: {name}{RESET}", speed=0.03, sound=True)
     print(f"{CYAN}{'='*50}{RESET}\n")
     
     if "{INPUT}" in command:
-        user_val = input(f"{RED}Enter Target (IP/Username/Phone): {RESET}")
+        user_val = input(f"{RED}Enter Target: {RESET}")
         command = command.replace("{INPUT}", user_val)
         
     if "{TARGET_IMAGE}" in command:
@@ -239,13 +266,12 @@ def execute_tool(name, command):
     except Exception as e:
         print(f"\n{RED}[ERROR] Failed to execute: {e}{RESET}")
     
-    play_beep()
+    play_typing()
     input(f"\n{CYAN}[Press Enter to return to main menu...]{RESET}")
 
 def main_menu():
     startup_sequence()
     clear_screen()
-    # Print the ASCII art left-aligned in the main menu for the dashboard look
     for line in ASCII_ART.split('\n'):
         print(f"{CYAN}{line}{RESET}")
         
@@ -269,7 +295,7 @@ def main_menu():
     print(f"{CYAN}{'='*50}{RESET}")
     
     choice = input(f"\n{RED}root@EyeHole:~# {RESET}").strip()
-    play_beep()
+    play_typing()
     
     if choice.upper() == 'A':
         add_tool(tools)
