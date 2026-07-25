@@ -34,18 +34,28 @@ def play_audio(filename, async_play=True):
         return
 
     if os.name == 'nt':
-        try:
-            import winsound
-            flags = winsound.SND_FILENAME
-            if async_play:
-                flags |= winsound.SND_ASYNC
-            winsound.PlaySound(path, flags)
-        except:
-            sys.stdout.write('\a')
+        if filename.endswith(".wav"):
+            try:
+                import winsound
+                flags = winsound.SND_FILENAME
+                if async_play:
+                    flags |= winsound.SND_ASYNC
+                winsound.PlaySound(path, flags)
+            except:
+                pass
+        else:
+            try:
+                import ctypes
+                alias = f"sfx_{hash(filename) % 10000}"
+                ctypes.windll.winmm.mciSendStringW(f'close {alias}', None, 0, None)
+                ctypes.windll.winmm.mciSendStringW(f'open "{path}" alias {alias}', None, 0, None)
+                ctypes.windll.winmm.mciSendStringW(f'play {alias}', None, 0, None)
+            except:
+                pass
     else:
         # termux/linux fallback
         bg = "&" if async_play else ""
-        os.system(f"termux-media-player play {path} > /dev/null 2>&1 {bg} || play -q {path} > /dev/null 2>&1 {bg}")
+        os.system(f"termux-media-player play '{path}' > /dev/null 2>&1 {bg} || play -q '{path}' > /dev/null 2>&1 {bg}")
 
 def play_typing():
     play_audio("sfx_typing.wav", async_play=True)
@@ -53,11 +63,16 @@ def play_typing():
 def play_glitch():
     play_audio("sfx_glitch.wav", async_play=True)
 
+def play_startup():
+    play_audio("watch-dogs-2-sound-effect-starting-a-mission.mp3", async_play=True)
+
 def stop_audio():
     if os.name == 'nt':
         try:
             import winsound
             winsound.PlaySound(None, winsound.SND_PURGE)
+            import ctypes
+            ctypes.windll.winmm.mciSendStringW('close all', None, 0, None)
         except:
             pass
 
@@ -110,7 +125,7 @@ def full_screen_glitch_exit(duration=2.5):
     clear_screen()
     sys.exit(0)
 
-def center_glitch_effect(duration=1.5):
+def center_glitch_effect(duration=1.5, use_sfx=True):
     start_time = time.time()
     characters = "!@#$%^&*()_+-=[]{}|;:,.<>?"
     ascii_lines = ASCII_ART.split('\n')
@@ -119,7 +134,9 @@ def center_glitch_effect(duration=1.5):
     h_pad = get_horizontal_padding(line_len)
     v_pad = get_vertical_padding(len(ascii_lines) + 6)
     
-    play_glitch()
+    if use_sfx:
+        play_glitch()
+        
     while time.time() - start_time < duration:
         clear_screen()
         print(v_pad, end="")
@@ -133,7 +150,9 @@ def center_glitch_effect(duration=1.5):
             print(f"{h_pad}{CYAN}{glitched_line}{RESET}")
         time.sleep(0.1)
     
-    stop_audio()
+    if use_sfx:
+        stop_audio()
+        
     clear_screen()
     print(v_pad, end="")
     for line in ascii_lines:
@@ -146,7 +165,9 @@ def startup_sequence():
     clear_screen()
     time.sleep(0.5)
     
-    center_glitch_effect(duration=2.0)
+    # Trigger the new MP3 sound instead of the wav glitch noise!
+    play_startup()
+    center_glitch_effect(duration=2.0, use_sfx=False)
     print("\n")
     
     typewriter_centered("JOIN YES?   Y=YES   N=NO", color=f"{RED}{BOLD}", speed=0.04, sound=True)
